@@ -27,6 +27,7 @@
 
 #include "qemu/osdep.h"
 #include "hw/sysbus.h"
+#include "audio/audio.h"
 
 #define TYPE_SCREAMER "screamer"
 OBJECT_DECLARE_SIMPLE_TYPE(ScreamerState, SCREAMER)
@@ -38,6 +39,8 @@ struct ScreamerState {
     /*< public >*/
     MemoryRegion mem;
     qemu_irq irq;
+
+    QEMUSoundCard card;
 };
 
 #endif
