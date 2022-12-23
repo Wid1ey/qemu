@@ -74,6 +74,7 @@ GlobalProperty hw_compat_7_2[] = {
     { "virtio-mem", "x-early-migration", "false" },
     { "migration", "x-preempt-pre-7-2", "true" },
     { TYPE_PCI_DEVICE, "x-pcie-err-unc-mask", "off" },
+    { "arm-gicv3-its", "itt-entry-size", "12" },
 };
 const size_t hw_compat_7_2_len = G_N_ELEMENTS(hw_compat_7_2);
 
