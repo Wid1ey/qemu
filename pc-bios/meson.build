@@ -5,6 +5,8 @@ if unpack_edk2_blobs
     'edk2-aarch64-secure-code.fd',
     'edk2-arm-code.fd',
     'edk2-arm-vars.fd',
+    'edk2-riscv-code.fd',
+    'edk2-riscv-vars.fd',
     'edk2-i386-code.fd',
     'edk2-i386-secure-code.fd',
     'edk2-i386-vars.fd',
@@ -58,10 +60,6 @@ blobs = [
   'efi-e1000e.rom',
   'efi-vmxnet3.rom',
   'qemu-nsis.bmp',
-  'bamboo.dtb',
-  'canyonlands.dtb',
-  'petalogix-s3adsp1800.dtb',
-  'petalogix-ml605.dtb',
   'multiboot.bin',
   'multiboot_dma.bin',
   'linuxboot.bin',
@@ -78,12 +76,34 @@ blobs = [
   'qemu_vga.ndrv',
   'edk2-licenses.txt',
   'hppa-firmware.img',
+  'hppa-firmware64.img',
   'opensbi-riscv32-generic-fw_dynamic.bin',
   'opensbi-riscv64-generic-fw_dynamic.bin',
   'npcm7xx_bootrom.bin',
   'vof.bin',
   'vof-nvram.bin',
 ]
+
+dtc = find_program('dtc', required: false)
+foreach f : [
+  'bamboo.dts',
+  'canyonlands.dts',
+  'petalogix-s3adsp1800.dts',
+  'petalogix-ml605.dts',
+]
+  out = fs.replace_suffix(f, '.dtb')
+  if dtc.found()
+    custom_target(f,
+        build_by_default: have_system,
+        input: files(f),
+        output: out,
+        install: get_option('install_blobs'),
+        install_dir: qemu_datadir,
+        command: [ dtc, '-I', 'dts', '-O', 'dtb', '-o', '@OUTPUT@', '@INPUT0@' ])
+  else
+    blobs += out
+  endif
+endforeach
 
 if get_option('install_blobs')
   install_data(blobs, install_dir: qemu_datadir)

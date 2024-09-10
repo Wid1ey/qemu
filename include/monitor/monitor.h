@@ -40,6 +40,9 @@ void monitor_flush(Monitor *mon);
 int monitor_set_cpu(Monitor *mon, int cpu_index);
 int monitor_get_cpu_index(Monitor *mon);
 
+int monitor_puts_locked(Monitor *mon, const char *str);
+void monitor_flush_locked(Monitor *mon);
+
 void *gpa2hva(MemoryRegion **p_mr, hwaddr addr, uint64_t size, Error **errp);
 
 void monitor_read_command(MonitorHMP *mon, int show_prompt);
@@ -48,9 +51,8 @@ int monitor_read_password(MonitorHMP *mon, ReadLineFunc *readline_func,
 
 AddfdInfo *monitor_fdset_add_fd(int fd, bool has_fdset_id, int64_t fdset_id,
                                 const char *opaque, Error **errp);
-int monitor_fdset_dup_fd_add(int64_t fdset_id, int flags);
+int monitor_fdset_dup_fd_add(int64_t fdset_id, int flags, Error **errp);
 void monitor_fdset_dup_fd_remove(int dup_fd);
-int64_t monitor_fdset_dup_fd_find(int dup_fd);
 
 void monitor_register_hmp(const char *name, bool info,
                           void (*cmd)(Monitor *mon, const QDict *qdict));

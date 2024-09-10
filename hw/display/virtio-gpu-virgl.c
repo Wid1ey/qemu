@@ -18,9 +18,17 @@
 #include "hw/virtio/virtio.h"
 #include "hw/virtio/virtio-gpu.h"
 
+#include "ui/egl-helpers.h"
+
 #include <virglrenderer.h>
 
-static struct virgl_renderer_callbacks virtio_gpu_3d_cbs;
+#if VIRGL_RENDERER_CALLBACKS_VERSION >= 4
+static void *
+virgl_get_egl_display(G_GNUC_UNUSED void *cookie)
+{
+    return qemu_egl_display;
+}
+#endif
 
 static void virgl_cmd_create_resource_2d(VirtIOGPU *g,
                                          struct virtio_gpu_ctrl_command *cmd)
@@ -143,7 +151,8 @@ static void virgl_cmd_resource_flush(VirtIOGPU *g,
 
 static GLuint virgl_borrow_texture_for_scanout(uint32_t id, bool *y_0_top,
                                                uint32_t *width,
-                                               uint32_t *height)
+                                               uint32_t *height,
+                                               void **d3d_tex2d)
 {
     struct virgl_renderer_texture_info info;
     int ret;
@@ -167,8 +176,55 @@ static GLuint virgl_borrow_texture_for_scanout(uint32_t id, bool *y_0_top,
         *height = info.height;
     }
 
+    if (d3d_tex2d) {
+        *d3d_tex2d = NULL;
+    }
+
     return info.tex_id;
 }
+
+#ifdef HAVE_VIRGL_D3D_INFO_EXT
+static GLuint virgl_borrow_d3d_info_for_scanout(uint32_t id, bool *y_0_top,
+                                                uint32_t *width,
+                                                uint32_t *height,
+                                                void **d3d_tex2d)
+{
+    int ret;
+    struct virgl_renderer_resource_info info;
+    struct virgl_renderer_resource_info_ext ext;
+    void *d3d_tex2d = NULL;
+
+    memset(&ext, 0, sizeof(ext));
+
+    ret = virgl_renderer_resource_get_info_ext(id, &ext);
+    info = ext.base;
+    d3d_tex2d = ext.d3d_tex2d;
+    if (ret) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                        "%s: illegal resource specified %d\n",
+                        __func__, id);
+        return 0;
+    }
+
+    if (y_0_top) {
+        *y_0_top = info.flags & VIRTIO_GPU_RESOURCE_FLAG_Y_0_TOP;
+    }
+
+    if (width) {
+        *width = info.width;
+    }
+
+    if (height) {
+        *height = info.height;
+    }
+
+    if (d3d_tex2d) {
+        *d3d_tex2d = ext.d3d_tex2d;
+    }
+
+    return info.tex_id;
+}
+#endif
 
 static void virgl_cmd_set_scanout(VirtIOGPU *g,
                                   struct virtio_gpu_ctrl_command *cmd)
@@ -188,13 +244,18 @@ static void virgl_cmd_set_scanout(VirtIOGPU *g,
     g->parent_obj.enable = 1;
 
     if (ss.resource_id && ss.r.width && ss.r.height) {
+        DisplayGLTextureBorrower borrower;
+#ifdef HAVE_VIRGL_D3D_INFO_EXT
+        borrower = virgl_borrow_d3d_info_for_scanout;
+#else
+        borrower = virgl_borrow_texture_for_scanout;
+#endif
         qemu_console_resize(g->parent_obj.scanout[ss.scanout_id].con,
                             ss.r.width, ss.r.height);
         virgl_renderer_force_ctx_0();
         dpy_gl_scanout_texture(
             g->parent_obj.scanout[ss.scanout_id].con, ss.resource_id,
-            virgl_borrow_texture_for_scanout,
-            ss.r.x, ss.r.y, ss.r.width, ss.r.height);
+            borrower, ss.r.x, ss.r.y, ss.r.width, ss.r.height);
     } else {
         dpy_gfx_replace_surface(
             g->parent_obj.scanout[ss.scanout_id].con, NULL);
@@ -623,8 +684,21 @@ void virtio_gpu_virgl_reset(VirtIOGPU *g)
 int virtio_gpu_virgl_init(VirtIOGPU *g)
 {
     int ret;
+    uint32_t flags = 0;
 
-    ret = virgl_renderer_init(g, 0, &virtio_gpu_3d_cbs);
+#if VIRGL_RENDERER_CALLBACKS_VERSION >= 4
+    if (qemu_egl_display) {
+        virtio_gpu_3d_cbs.version = 4;
+        virtio_gpu_3d_cbs.get_egl_display = virgl_get_egl_display;
+    }
+#endif
+#ifdef VIRGL_RENDERER_D3D11_SHARE_TEXTURE
+    if (qemu_egl_angle_d3d) {
+        flags |= VIRGL_RENDERER_D3D11_SHARE_TEXTURE;
+    }
+#endif
+
+    ret = virgl_renderer_init(g, flags, &virtio_gpu_3d_cbs);
     if (ret != 0) {
         error_report("virgl could not be initialized: %d", ret);
         return ret;

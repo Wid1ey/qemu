@@ -50,3 +50,11 @@ config CS4231
 
 config SCREAMER
     bool
+
+config ASC
+    bool
+
+config VIRTIO_SND
+    bool
+    default y
+    depends on VIRTIO

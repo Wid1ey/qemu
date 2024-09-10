@@ -13,6 +13,7 @@
 #include "hw/qdev-properties.h"
 #include "migration/vmstate.h"
 #include "include/hw/audio/screamer.h"
+#include "qapi/error.h"
 
 #define DEBUG_SCREAMER 0
 #define DPRINTF(fmt, ...) \
@@ -926,7 +927,7 @@ static void screamer_init(Object *obj)
     sysbus_init_irq(d, &s->dma_receive_irq);
 
     /* Registers Screamer with QEMU's audio system */
-    AUD_register_card(SOUND_CHIP_NAME, &s->card);
+    AUD_register_card(SOUND_CHIP_NAME, &s->card, &error_fatal);
 }
 
 

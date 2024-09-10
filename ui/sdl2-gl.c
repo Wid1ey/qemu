@@ -67,6 +67,10 @@ void sdl2_gl_update(DisplayChangeListener *dcl,
 
     assert(scon->opengl);
 
+    if (!scon->real_window) {
+        return;
+    }
+
     SDL_GL_MakeCurrent(scon->real_window, scon->winctx);
     surface_gl_update_texture(scon->gls, scon->surface, x, y, w, h);
     scon->updates++;
@@ -85,7 +89,7 @@ void sdl2_gl_switch(DisplayChangeListener *dcl,
 
     scon->surface = new_surface;
 
-    if (is_placeholder(new_surface) && qemu_console_get_index(dcl->con)) {
+    if (surface_is_placeholder(new_surface) && qemu_console_get_index(dcl->con)) {
         qemu_gl_fini_shader(scon->gls);
         scon->gls = NULL;
         sdl2_window_destroy(scon);
@@ -205,11 +209,13 @@ void sdl2_gl_scanout_texture(DisplayChangeListener *dcl,
     bool backing_y_0_top;
     uint32_t backing_width;
     uint32_t backing_height;
+    void *d3d_tex2d;
 
     assert(scon->opengl);
 
     GLuint backing_texture = backing_borrow(backing_id, &backing_y_0_top,
-                                            &backing_width, &backing_height);
+                                            &backing_width, &backing_height,
+                                            &d3d_tex2d);
 
     scon->x = x;
     scon->y = y;

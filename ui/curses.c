@@ -405,7 +405,7 @@ static void curses_refresh(DisplayChangeListener *dcl)
             if (keysym == -1)
                 keysym = chr;
 
-            kbd_put_keysym_console(dcl->con, keysym);
+            qemu_text_console_put_keysym(QEMU_TEXT_CONSOLE(dcl->con), keysym);
         }
     }
 }
@@ -803,7 +803,7 @@ static void curses_display_init(DisplayState *ds, DisplayOptions *opts)
     curses_winch_init();
 
     dcl = g_new0(DisplayChangeListener, 1);
-    dcl->con = qemu_console_lookup_first_graphic_console();
+    dcl->con = qemu_console_lookup_default();
     dcl->ops = &dcl_ops;
     register_displaychangelistener(dcl);
 

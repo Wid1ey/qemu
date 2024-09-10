@@ -21,10 +21,6 @@
  */
 
 #include "qemu/osdep.h"
-#include "tcg/tcg-op.h"
-#include "tcg/tcg-op-gvec.h"
-#include "exec/exec-all.h"
-#include "exec/gen-icount.h"
 #include "translate.h"
 #include "translate-a32.h"
 
@@ -36,7 +32,7 @@
 static TCGv_ptr vfp_reg_ptr(bool dp, int reg)
 {
     TCGv_ptr ret = tcg_temp_new_ptr();
-    tcg_gen_addi_ptr(ret, cpu_env, vfp_reg_offset(dp, reg));
+    tcg_gen_addi_ptr(ret, tcg_env, vfp_reg_offset(dp, reg));
     return ret;
 }
 
@@ -46,13 +42,13 @@ static void neon_load_element(TCGv_i32 var, int reg, int ele, MemOp mop)
 
     switch (mop) {
     case MO_UB:
-        tcg_gen_ld8u_i32(var, cpu_env, offset);
+        tcg_gen_ld8u_i32(var, tcg_env, offset);
         break;
     case MO_UW:
-        tcg_gen_ld16u_i32(var, cpu_env, offset);
+        tcg_gen_ld16u_i32(var, tcg_env, offset);
         break;
     case MO_UL:
-        tcg_gen_ld_i32(var, cpu_env, offset);
+        tcg_gen_ld_i32(var, tcg_env, offset);
         break;
     default:
         g_assert_not_reached();
@@ -65,16 +61,16 @@ static void neon_load_element64(TCGv_i64 var, int reg, int ele, MemOp mop)
 
     switch (mop) {
     case MO_UB:
-        tcg_gen_ld8u_i64(var, cpu_env, offset);
+        tcg_gen_ld8u_i64(var, tcg_env, offset);
         break;
     case MO_UW:
-        tcg_gen_ld16u_i64(var, cpu_env, offset);
+        tcg_gen_ld16u_i64(var, tcg_env, offset);
         break;
     case MO_UL:
-        tcg_gen_ld32u_i64(var, cpu_env, offset);
+        tcg_gen_ld32u_i64(var, tcg_env, offset);
         break;
     case MO_UQ:
-        tcg_gen_ld_i64(var, cpu_env, offset);
+        tcg_gen_ld_i64(var, tcg_env, offset);
         break;
     default:
         g_assert_not_reached();
@@ -87,13 +83,13 @@ static void neon_store_element(int reg, int ele, MemOp size, TCGv_i32 var)
 
     switch (size) {
     case MO_8:
-        tcg_gen_st8_i32(var, cpu_env, offset);
+        tcg_gen_st8_i32(var, tcg_env, offset);
         break;
     case MO_16:
-        tcg_gen_st16_i32(var, cpu_env, offset);
+        tcg_gen_st16_i32(var, tcg_env, offset);
         break;
     case MO_32:
-        tcg_gen_st_i32(var, cpu_env, offset);
+        tcg_gen_st_i32(var, tcg_env, offset);
         break;
     default:
         g_assert_not_reached();
@@ -106,16 +102,16 @@ static void neon_store_element64(int reg, int ele, MemOp size, TCGv_i64 var)
 
     switch (size) {
     case MO_8:
-        tcg_gen_st8_i64(var, cpu_env, offset);
+        tcg_gen_st8_i64(var, tcg_env, offset);
         break;
     case MO_16:
-        tcg_gen_st16_i64(var, cpu_env, offset);
+        tcg_gen_st16_i64(var, tcg_env, offset);
         break;
     case MO_32:
-        tcg_gen_st32_i64(var, cpu_env, offset);
+        tcg_gen_st32_i64(var, tcg_env, offset);
         break;
     case MO_64:
-        tcg_gen_st_i64(var, cpu_env, offset);
+        tcg_gen_st_i64(var, tcg_env, offset);
         break;
     default:
         g_assert_not_reached();
@@ -300,7 +296,7 @@ static bool trans_VFML(DisasContext *s, arg_VFML *a)
     tcg_gen_gvec_3_ptr(vfp_reg_offset(1, a->vd),
                        vfp_reg_offset(a->q, a->vn),
                        vfp_reg_offset(a->q, a->vm),
-                       cpu_env, opr_sz, opr_sz, a->s, /* is_2 == 0 */
+                       tcg_env, opr_sz, opr_sz, a->s, /* is_2 == 0 */
                        gen_helper_gvec_fmlal_a32);
     return true;
 }
@@ -394,7 +390,7 @@ static bool trans_VFML_scalar(DisasContext *s, arg_VFML_scalar *a)
     tcg_gen_gvec_3_ptr(vfp_reg_offset(1, a->vd),
                        vfp_reg_offset(a->q, a->vn),
                        vfp_reg_offset(a->q, a->rm),
-                       cpu_env, opr_sz, opr_sz,
+                       tcg_env, opr_sz, opr_sz,
                        (a->index << 2) | a->s, /* is_2 == 0 */
                        gen_helper_gvec_fmlal_idx_a32);
     return true;
@@ -798,6 +794,12 @@ DO_3SAME(VQADD_S, gen_gvec_sqadd_qc)
 DO_3SAME(VQADD_U, gen_gvec_uqadd_qc)
 DO_3SAME(VQSUB_S, gen_gvec_sqsub_qc)
 DO_3SAME(VQSUB_U, gen_gvec_uqsub_qc)
+DO_3SAME(VRSHL_S, gen_gvec_srshl)
+DO_3SAME(VRSHL_U, gen_gvec_urshl)
+DO_3SAME(VQSHL_S, gen_neon_sqshl)
+DO_3SAME(VQSHL_U, gen_neon_uqshl)
+DO_3SAME(VQRSHL_S, gen_neon_sqrshl)
+DO_3SAME(VQRSHL_U, gen_neon_uqrshl)
 
 /* These insns are all gvec_bitsel but with the inputs in various orders. */
 #define DO_3SAME_BITSEL(INSN, O1, O2, O3)                               \
@@ -834,6 +836,17 @@ DO_3SAME_NO_SZ_3(VABD_S, gen_gvec_sabd)
 DO_3SAME_NO_SZ_3(VABA_S, gen_gvec_saba)
 DO_3SAME_NO_SZ_3(VABD_U, gen_gvec_uabd)
 DO_3SAME_NO_SZ_3(VABA_U, gen_gvec_uaba)
+DO_3SAME_NO_SZ_3(VPADD, gen_gvec_addp)
+DO_3SAME_NO_SZ_3(VPMAX_S, gen_gvec_smaxp)
+DO_3SAME_NO_SZ_3(VPMIN_S, gen_gvec_sminp)
+DO_3SAME_NO_SZ_3(VPMAX_U, gen_gvec_umaxp)
+DO_3SAME_NO_SZ_3(VPMIN_U, gen_gvec_uminp)
+DO_3SAME_NO_SZ_3(VHADD_S, gen_gvec_shadd)
+DO_3SAME_NO_SZ_3(VHADD_U, gen_gvec_uhadd)
+DO_3SAME_NO_SZ_3(VHSUB_S, gen_gvec_shsub)
+DO_3SAME_NO_SZ_3(VHSUB_U, gen_gvec_uhsub)
+DO_3SAME_NO_SZ_3(VRHADD_S, gen_gvec_srhadd)
+DO_3SAME_NO_SZ_3(VRHADD_U, gen_gvec_urhadd)
 
 #define DO_3SAME_CMP(INSN, COND)                                        \
     static void gen_##INSN##_3s(unsigned vece, uint32_t rd_ofs,         \
@@ -911,53 +924,8 @@ DO_SHA2(SHA256H, gen_helper_crypto_sha256h)
 DO_SHA2(SHA256H2, gen_helper_crypto_sha256h2)
 DO_SHA2(SHA256SU1, gen_helper_crypto_sha256su1)
 
-#define DO_3SAME_64(INSN, FUNC)                                         \
-    static void gen_##INSN##_3s(unsigned vece, uint32_t rd_ofs,         \
-                                uint32_t rn_ofs, uint32_t rm_ofs,       \
-                                uint32_t oprsz, uint32_t maxsz)         \
-    {                                                                   \
-        static const GVecGen3 op = { .fni8 = FUNC };                    \
-        tcg_gen_gvec_3(rd_ofs, rn_ofs, rm_ofs, oprsz, maxsz, &op);      \
-    }                                                                   \
-    DO_3SAME(INSN, gen_##INSN##_3s)
-
-#define DO_3SAME_64_ENV(INSN, FUNC)                                     \
-    static void gen_##INSN##_elt(TCGv_i64 d, TCGv_i64 n, TCGv_i64 m)    \
-    {                                                                   \
-        FUNC(d, cpu_env, n, m);                                         \
-    }                                                                   \
-    DO_3SAME_64(INSN, gen_##INSN##_elt)
-
-DO_3SAME_64(VRSHL_S64, gen_helper_neon_rshl_s64)
-DO_3SAME_64(VRSHL_U64, gen_helper_neon_rshl_u64)
-DO_3SAME_64_ENV(VQSHL_S64, gen_helper_neon_qshl_s64)
-DO_3SAME_64_ENV(VQSHL_U64, gen_helper_neon_qshl_u64)
-DO_3SAME_64_ENV(VQRSHL_S64, gen_helper_neon_qrshl_s64)
-DO_3SAME_64_ENV(VQRSHL_U64, gen_helper_neon_qrshl_u64)
-
-#define DO_3SAME_32(INSN, FUNC)                                         \
-    static void gen_##INSN##_3s(unsigned vece, uint32_t rd_ofs,         \
-                                uint32_t rn_ofs, uint32_t rm_ofs,       \
-                                uint32_t oprsz, uint32_t maxsz)         \
-    {                                                                   \
-        static const GVecGen3 ops[4] = {                                \
-            { .fni4 = gen_helper_neon_##FUNC##8 },                      \
-            { .fni4 = gen_helper_neon_##FUNC##16 },                     \
-            { .fni4 = gen_helper_neon_##FUNC##32 },                     \
-            { 0 },                                                      \
-        };                                                              \
-        tcg_gen_gvec_3(rd_ofs, rn_ofs, rm_ofs, oprsz, maxsz, &ops[vece]); \
-    }                                                                   \
-    static bool trans_##INSN##_3s(DisasContext *s, arg_3same *a)        \
-    {                                                                   \
-        if (a->size > 2) {                                              \
-            return false;                                               \
-        }                                                               \
-        return do_3same(s, a, gen_##INSN##_3s);                         \
-    }
-
 /*
- * Some helper functions need to be passed the cpu_env. In order
+ * Some helper functions need to be passed the tcg_env. In order
  * to use those with the gvec APIs like tcg_gen_gvec_3() we need
  * to create wrapper functions whose prototype is a NeonGenTwoOpFn()
  * and which call a NeonGenTwoOpEnvFn().
@@ -965,146 +933,15 @@ DO_3SAME_64_ENV(VQRSHL_U64, gen_helper_neon_qrshl_u64)
 #define WRAP_ENV_FN(WRAPNAME, FUNC)                                     \
     static void WRAPNAME(TCGv_i32 d, TCGv_i32 n, TCGv_i32 m)            \
     {                                                                   \
-        FUNC(d, cpu_env, n, m);                                         \
+        FUNC(d, tcg_env, n, m);                                         \
     }
-
-#define DO_3SAME_32_ENV(INSN, FUNC)                                     \
-    WRAP_ENV_FN(gen_##INSN##_tramp8, gen_helper_neon_##FUNC##8);        \
-    WRAP_ENV_FN(gen_##INSN##_tramp16, gen_helper_neon_##FUNC##16);      \
-    WRAP_ENV_FN(gen_##INSN##_tramp32, gen_helper_neon_##FUNC##32);      \
-    static void gen_##INSN##_3s(unsigned vece, uint32_t rd_ofs,         \
-                                uint32_t rn_ofs, uint32_t rm_ofs,       \
-                                uint32_t oprsz, uint32_t maxsz)         \
-    {                                                                   \
-        static const GVecGen3 ops[4] = {                                \
-            { .fni4 = gen_##INSN##_tramp8 },                            \
-            { .fni4 = gen_##INSN##_tramp16 },                           \
-            { .fni4 = gen_##INSN##_tramp32 },                           \
-            { 0 },                                                      \
-        };                                                              \
-        tcg_gen_gvec_3(rd_ofs, rn_ofs, rm_ofs, oprsz, maxsz, &ops[vece]); \
-    }                                                                   \
-    static bool trans_##INSN##_3s(DisasContext *s, arg_3same *a)        \
-    {                                                                   \
-        if (a->size > 2) {                                              \
-            return false;                                               \
-        }                                                               \
-        return do_3same(s, a, gen_##INSN##_3s);                         \
-    }
-
-DO_3SAME_32(VHADD_S, hadd_s)
-DO_3SAME_32(VHADD_U, hadd_u)
-DO_3SAME_32(VHSUB_S, hsub_s)
-DO_3SAME_32(VHSUB_U, hsub_u)
-DO_3SAME_32(VRHADD_S, rhadd_s)
-DO_3SAME_32(VRHADD_U, rhadd_u)
-DO_3SAME_32(VRSHL_S, rshl_s)
-DO_3SAME_32(VRSHL_U, rshl_u)
-
-DO_3SAME_32_ENV(VQSHL_S, qshl_s)
-DO_3SAME_32_ENV(VQSHL_U, qshl_u)
-DO_3SAME_32_ENV(VQRSHL_S, qrshl_s)
-DO_3SAME_32_ENV(VQRSHL_U, qrshl_u)
-
-static bool do_3same_pair(DisasContext *s, arg_3same *a, NeonGenTwoOpFn *fn)
-{
-    /* Operations handled pairwise 32 bits at a time */
-    TCGv_i32 tmp, tmp2, tmp3;
-
-    if (!arm_dc_feature(s, ARM_FEATURE_NEON)) {
-        return false;
-    }
-
-    /* UNDEF accesses to D16-D31 if they don't exist. */
-    if (!dc_isar_feature(aa32_simd_r32, s) &&
-        ((a->vd | a->vn | a->vm) & 0x10)) {
-        return false;
-    }
-
-    if (a->size == 3) {
-        return false;
-    }
-
-    if (!vfp_access_check(s)) {
-        return true;
-    }
-
-    assert(a->q == 0); /* enforced by decode patterns */
-
-    /*
-     * Note that we have to be careful not to clobber the source operands
-     * in the "vm == vd" case by storing the result of the first pass too
-     * early. Since Q is 0 there are always just two passes, so instead
-     * of a complicated loop over each pass we just unroll.
-     */
-    tmp = tcg_temp_new_i32();
-    tmp2 = tcg_temp_new_i32();
-    tmp3 = tcg_temp_new_i32();
-
-    read_neon_element32(tmp, a->vn, 0, MO_32);
-    read_neon_element32(tmp2, a->vn, 1, MO_32);
-    fn(tmp, tmp, tmp2);
-
-    read_neon_element32(tmp3, a->vm, 0, MO_32);
-    read_neon_element32(tmp2, a->vm, 1, MO_32);
-    fn(tmp3, tmp3, tmp2);
-
-    write_neon_element32(tmp, a->vd, 0, MO_32);
-    write_neon_element32(tmp3, a->vd, 1, MO_32);
-
-    return true;
-}
-
-#define DO_3SAME_PAIR(INSN, func)                                       \
-    static bool trans_##INSN##_3s(DisasContext *s, arg_3same *a)        \
-    {                                                                   \
-        static NeonGenTwoOpFn * const fns[] = {                         \
-            gen_helper_neon_##func##8,                                  \
-            gen_helper_neon_##func##16,                                 \
-            gen_helper_neon_##func##32,                                 \
-        };                                                              \
-        if (a->size > 2) {                                              \
-            return false;                                               \
-        }                                                               \
-        return do_3same_pair(s, a, fns[a->size]);                       \
-    }
-
-/* 32-bit pairwise ops end up the same as the elementwise versions.  */
-#define gen_helper_neon_pmax_s32  tcg_gen_smax_i32
-#define gen_helper_neon_pmax_u32  tcg_gen_umax_i32
-#define gen_helper_neon_pmin_s32  tcg_gen_smin_i32
-#define gen_helper_neon_pmin_u32  tcg_gen_umin_i32
-#define gen_helper_neon_padd_u32  tcg_gen_add_i32
-
-DO_3SAME_PAIR(VPMAX_S, pmax_s)
-DO_3SAME_PAIR(VPMIN_S, pmin_s)
-DO_3SAME_PAIR(VPMAX_U, pmax_u)
-DO_3SAME_PAIR(VPMIN_U, pmin_u)
-DO_3SAME_PAIR(VPADD, padd_u)
 
 #define DO_3SAME_VQDMULH(INSN, FUNC)                                    \
-    WRAP_ENV_FN(gen_##INSN##_tramp16, gen_helper_neon_##FUNC##_s16);    \
-    WRAP_ENV_FN(gen_##INSN##_tramp32, gen_helper_neon_##FUNC##_s32);    \
-    static void gen_##INSN##_3s(unsigned vece, uint32_t rd_ofs,         \
-                                uint32_t rn_ofs, uint32_t rm_ofs,       \
-                                uint32_t oprsz, uint32_t maxsz)         \
-    {                                                                   \
-        static const GVecGen3 ops[2] = {                                \
-            { .fni4 = gen_##INSN##_tramp16 },                           \
-            { .fni4 = gen_##INSN##_tramp32 },                           \
-        };                                                              \
-        tcg_gen_gvec_3(rd_ofs, rn_ofs, rm_ofs, oprsz, maxsz, &ops[vece - 1]); \
-    }                                                                   \
     static bool trans_##INSN##_3s(DisasContext *s, arg_3same *a)        \
-    {                                                                   \
-        if (a->size != 1 && a->size != 2) {                             \
-            return false;                                               \
-        }                                                               \
-        return do_3same(s, a, gen_##INSN##_3s);                         \
-    }
+    { return a->size >= 1 && a->size <= 2 && do_3same(s, a, FUNC); }
 
-DO_3SAME_VQDMULH(VQDMULH, qdmulh)
-DO_3SAME_VQDMULH(VQRDMULH, qrdmulh)
+DO_3SAME_VQDMULH(VQDMULH, gen_gvec_sqdmulh_qc)
+DO_3SAME_VQDMULH(VQRDMULH, gen_gvec_sqrdmulh_qc)
 
 #define WRAP_FP_GVEC(WRAPNAME, FPST, FUNC)                              \
     static void WRAPNAME(unsigned vece, uint32_t rd_ofs,                \
@@ -1148,6 +985,9 @@ DO_3S_FP_GVEC(VFMA, gen_helper_gvec_vfma_s, gen_helper_gvec_vfma_h)
 DO_3S_FP_GVEC(VFMS, gen_helper_gvec_vfms_s, gen_helper_gvec_vfms_h)
 DO_3S_FP_GVEC(VRECPS, gen_helper_gvec_recps_nf_s, gen_helper_gvec_recps_nf_h)
 DO_3S_FP_GVEC(VRSQRTS, gen_helper_gvec_rsqrts_nf_s, gen_helper_gvec_rsqrts_nf_h)
+DO_3S_FP_GVEC(VPADD, gen_helper_gvec_faddp_s, gen_helper_gvec_faddp_h)
+DO_3S_FP_GVEC(VPMAX, gen_helper_gvec_fmaxp_s, gen_helper_gvec_fmaxp_h)
+DO_3S_FP_GVEC(VPMIN, gen_helper_gvec_fminp_s, gen_helper_gvec_fminp_h)
 
 WRAP_FP_GVEC(gen_VMAXNM_fp32_3s, FPST_STD, gen_helper_gvec_fmaxnum_s)
 WRAP_FP_GVEC(gen_VMAXNM_fp16_3s, FPST_STD_F16, gen_helper_gvec_fmaxnum_h)
@@ -1183,58 +1023,6 @@ static bool trans_VMINNM_fp_3s(DisasContext *s, arg_3same *a)
     }
     return do_3same(s, a, gen_VMINNM_fp32_3s);
 }
-
-static bool do_3same_fp_pair(DisasContext *s, arg_3same *a,
-                             gen_helper_gvec_3_ptr *fn)
-{
-    /* FP pairwise operations */
-    TCGv_ptr fpstatus;
-
-    if (!arm_dc_feature(s, ARM_FEATURE_NEON)) {
-        return false;
-    }
-
-    /* UNDEF accesses to D16-D31 if they don't exist. */
-    if (!dc_isar_feature(aa32_simd_r32, s) &&
-        ((a->vd | a->vn | a->vm) & 0x10)) {
-        return false;
-    }
-
-    if (!vfp_access_check(s)) {
-        return true;
-    }
-
-    assert(a->q == 0); /* enforced by decode patterns */
-
-
-    fpstatus = fpstatus_ptr(a->size == MO_16 ? FPST_STD_F16 : FPST_STD);
-    tcg_gen_gvec_3_ptr(vfp_reg_offset(1, a->vd),
-                       vfp_reg_offset(1, a->vn),
-                       vfp_reg_offset(1, a->vm),
-                       fpstatus, 8, 8, 0, fn);
-
-    return true;
-}
-
-/*
- * For all the functions using this macro, size == 1 means fp16,
- * which is an architecture extension we don't implement yet.
- */
-#define DO_3S_FP_PAIR(INSN,FUNC)                                    \
-    static bool trans_##INSN##_fp_3s(DisasContext *s, arg_3same *a) \
-    {                                                               \
-        if (a->size == MO_16) {                                     \
-            if (!dc_isar_feature(aa32_fp16_arith, s)) {             \
-                return false;                                       \
-            }                                                       \
-            return do_3same_fp_pair(s, a, FUNC##h);                 \
-        }                                                           \
-        return do_3same_fp_pair(s, a, FUNC##s);                     \
-    }
-
-DO_3S_FP_PAIR(VPADD, gen_helper_neon_padd)
-DO_3S_FP_PAIR(VPMAX, gen_helper_neon_pmax)
-DO_3S_FP_PAIR(VPMIN, gen_helper_neon_pmin)
 
 static bool do_vector_2sh(DisasContext *s, arg_2reg_shift *a, GVecGen2iFn *fn)
 {
@@ -1309,7 +1097,7 @@ static bool do_2shift_env_64(DisasContext *s, arg_2reg_shift *a,
 {
     /*
      * 2-reg-and-shift operations, size == 3 case, where the
-     * function needs to be passed cpu_env.
+     * function needs to be passed tcg_env.
      */
     TCGv_i64 constimm;
     int pass;
@@ -1342,7 +1130,7 @@ static bool do_2shift_env_64(DisasContext *s, arg_2reg_shift *a,
         TCGv_i64 tmp = tcg_temp_new_i64();
 
         read_neon_element64(tmp, a->vm, pass, MO_64);
-        fn(tmp, cpu_env, tmp, constimm);
+        fn(tmp, tcg_env, tmp, constimm);
         write_neon_element64(tmp, a->vd, pass, MO_64);
     }
     return true;
@@ -1353,7 +1141,7 @@ static bool do_2shift_env_32(DisasContext *s, arg_2reg_shift *a,
 {
     /*
      * 2-reg-and-shift operations, size < 3 case, where the
-     * helper needs to be passed cpu_env.
+     * helper needs to be passed tcg_env.
      */
     TCGv_i32 constimm, tmp;
     int pass;
@@ -1385,7 +1173,7 @@ static bool do_2shift_env_32(DisasContext *s, arg_2reg_shift *a,
 
     for (pass = 0; pass < (a->q ? 4 : 2); pass++) {
         read_neon_element32(tmp, a->vm, pass, MO_32);
-        fn(tmp, cpu_env, tmp, constimm);
+        fn(tmp, tcg_env, tmp, constimm);
         write_neon_element32(tmp, a->vd, pass, MO_32);
     }
     return true;
@@ -1451,11 +1239,11 @@ static bool do_2shift_narrow_64(DisasContext *s, arg_2reg_shift *a,
     read_neon_element64(rm2, a->vm, 1, MO_64);
 
     shiftfn(rm1, rm1, constimm);
-    narrowfn(rd, cpu_env, rm1);
+    narrowfn(rd, tcg_env, rm1);
     write_neon_element32(rd, a->vd, 0, MO_32);
 
     shiftfn(rm2, rm2, constimm);
-    narrowfn(rd, cpu_env, rm2);
+    narrowfn(rd, tcg_env, rm2);
     write_neon_element32(rd, a->vd, 1, MO_32);
 
     return true;
@@ -1518,7 +1306,7 @@ static bool do_2shift_narrow_32(DisasContext *s, arg_2reg_shift *a,
 
     tcg_gen_concat_i32_i64(rtmp, rm1, rm2);
 
-    narrowfn(rm1, cpu_env, rtmp);
+    narrowfn(rm1, tcg_env, rtmp);
     write_neon_element32(rm1, a->vd, 0, MO_32);
 
     shiftfn(rm3, rm3, constimm);
@@ -1526,7 +1314,7 @@ static bool do_2shift_narrow_32(DisasContext *s, arg_2reg_shift *a,
 
     tcg_gen_concat_i32_i64(rtmp, rm3, rm4);
 
-    narrowfn(rm3, cpu_env, rtmp);
+    narrowfn(rm3, tcg_env, rtmp);
     write_neon_element32(rm3, a->vd, 1, MO_32);
     return true;
 }
@@ -2163,13 +1951,13 @@ DO_VMLAL(VMLSL_U,mull_u,sub)
 static void gen_VQDMULL_16(TCGv_i64 rd, TCGv_i32 rn, TCGv_i32 rm)
 {
     gen_helper_neon_mull_s16(rd, rn, rm);
-    gen_helper_neon_addl_saturate_s32(rd, cpu_env, rd, rd);
+    gen_helper_neon_addl_saturate_s32(rd, tcg_env, rd, rd);
 }
 
 static void gen_VQDMULL_32(TCGv_i64 rd, TCGv_i32 rn, TCGv_i32 rm)
 {
     gen_mull_s32(rd, rn, rm);
-    gen_helper_neon_addl_saturate_s64(rd, cpu_env, rd, rd);
+    gen_helper_neon_addl_saturate_s64(rd, tcg_env, rd, rd);
 }
 
 static bool trans_VQDMULL_3d(DisasContext *s, arg_3diff *a)
@@ -2186,12 +1974,12 @@ static bool trans_VQDMULL_3d(DisasContext *s, arg_3diff *a)
 
 static void gen_VQDMLAL_acc_16(TCGv_i64 rd, TCGv_i64 rn, TCGv_i64 rm)
 {
-    gen_helper_neon_addl_saturate_s32(rd, cpu_env, rn, rm);
+    gen_helper_neon_addl_saturate_s32(rd, tcg_env, rn, rm);
 }
 
 static void gen_VQDMLAL_acc_32(TCGv_i64 rd, TCGv_i64 rn, TCGv_i64 rm)
 {
-    gen_helper_neon_addl_saturate_s64(rd, cpu_env, rn, rm);
+    gen_helper_neon_addl_saturate_s64(rd, tcg_env, rn, rm);
 }
 
 static bool trans_VQDMLAL_3d(DisasContext *s, arg_3diff *a)
@@ -2215,13 +2003,13 @@ static bool trans_VQDMLAL_3d(DisasContext *s, arg_3diff *a)
 static void gen_VQDMLSL_acc_16(TCGv_i64 rd, TCGv_i64 rn, TCGv_i64 rm)
 {
     gen_helper_neon_negl_u32(rm, rm);
-    gen_helper_neon_addl_saturate_s32(rd, cpu_env, rn, rm);
+    gen_helper_neon_addl_saturate_s32(rd, tcg_env, rn, rm);
 }
 
 static void gen_VQDMLSL_acc_32(TCGv_i64 rd, TCGv_i64 rn, TCGv_i64 rm)
 {
     tcg_gen_neg_i64(rm, rm);
-    gen_helper_neon_addl_saturate_s64(rd, cpu_env, rn, rm);
+    gen_helper_neon_addl_saturate_s64(rd, tcg_env, rn, rm);
 }
 
 static bool trans_VQDMLSL_3d(DisasContext *s, arg_3diff *a)
@@ -2554,7 +2342,7 @@ static bool do_vqrdmlah_2sc(DisasContext *s, arg_2scalar *a,
     for (pass = 0; pass < (a->q ? 4 : 2); pass++) {
         read_neon_element32(rn, a->vn, pass, MO_32);
         read_neon_element32(rd, a->vd, pass, MO_32);
-        opfn(rd, cpu_env, rn, scalar, rd);
+        opfn(rd, tcg_env, rn, scalar, rd);
         write_neon_element32(rd, a->vd, pass, MO_32);
     }
     return true;
@@ -2841,7 +2629,7 @@ static bool trans_VTBL(DisasContext *s, arg_VTBL *a)
     val = tcg_temp_new_i64();
     read_neon_element64(val, a->vm, 0, MO_64);
 
-    gen_helper_neon_tbl(val, cpu_env, desc, val, def);
+    gen_helper_neon_tbl(val, tcg_env, desc, val, def);
     write_neon_element64(val, a->vd, 0, MO_64);
     return true;
 }
@@ -3175,9 +2963,9 @@ static bool do_vmovn(DisasContext *s, arg_2misc *a,
     rd1 = tcg_temp_new_i32();
 
     read_neon_element64(rm, a->vm, 0, MO_64);
-    narrowfn(rd0, cpu_env, rm);
+    narrowfn(rd0, tcg_env, rm);
     read_neon_element64(rm, a->vm, 1, MO_64);
-    narrowfn(rd1, cpu_env, rm);
+    narrowfn(rd1, tcg_env, rm);
     write_neon_element32(rd0, a->vd, 0, MO_32);
     write_neon_element32(rd1, a->vd, 1, MO_32);
     return true;
@@ -3455,9 +3243,9 @@ static bool trans_VMVN(DisasContext *s, arg_2misc *a)
     }
 
 WRAP_2M_3_OOL_FN(gen_AESE, gen_helper_crypto_aese, 0)
-WRAP_2M_3_OOL_FN(gen_AESD, gen_helper_crypto_aese, 1)
+WRAP_2M_3_OOL_FN(gen_AESD, gen_helper_crypto_aesd, 0)
 WRAP_2M_2_OOL_FN(gen_AESMC, gen_helper_crypto_aesmc, 0)
-WRAP_2M_2_OOL_FN(gen_AESIMC, gen_helper_crypto_aesmc, 1)
+WRAP_2M_2_OOL_FN(gen_AESIMC, gen_helper_crypto_aesimc, 0)
 WRAP_2M_2_OOL_FN(gen_SHA1H, gen_helper_crypto_sha1h, 0)
 WRAP_2M_2_OOL_FN(gen_SHA1SU1, gen_helper_crypto_sha1su1, 0)
 WRAP_2M_2_OOL_FN(gen_SHA256SU0, gen_helper_crypto_sha256su0, 0)
@@ -3629,7 +3417,7 @@ static bool trans_VRSQRTE(DisasContext *s, arg_2misc *a)
 #define WRAP_1OP_ENV_FN(WRAPNAME, FUNC) \
     static void WRAPNAME(TCGv_i32 d, TCGv_i32 m)        \
     {                                                   \
-        FUNC(d, cpu_env, m);                            \
+        FUNC(d, tcg_env, m);                            \
     }
 
 WRAP_1OP_ENV_FN(gen_VQABS_s8, gen_helper_neon_qabs_s8)

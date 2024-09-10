@@ -487,7 +487,7 @@ static const VMStateDescription vmstate_cuda = {
     .name = "cuda",
     .version_id = 6,
     .minimum_version_id = 6,
-    .fields = (VMStateField[]) {
+    .fields = (const VMStateField[]) {
         VMSTATE_STRUCT(mos6522_cuda.parent_obj, CUDAState, 0, vmstate_mos6522,
                        MOS6522State),
         VMSTATE_UINT8(last_b, CUDAState),
@@ -586,13 +586,13 @@ static void mos6522_cuda_portB_write(MOS6522State *s)
     cuda_update(cs);
 }
 
-static void mos6522_cuda_reset_hold(Object *obj)
+static void mos6522_cuda_reset_hold(Object *obj, ResetType type)
 {
     MOS6522State *ms = MOS6522(obj);
     MOS6522DeviceClass *mdc = MOS6522_GET_CLASS(ms);
 
     if (mdc->parent_phases.hold) {
-        mdc->parent_phases.hold(obj);
+        mdc->parent_phases.hold(obj, type);
     }
 
     ms->timers[0].frequency = CUDA_TIMER_FREQ;

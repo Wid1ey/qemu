@@ -33,6 +33,7 @@
 #include "qemu/uuid.h"
 
 #include "qemu/bitmap.h"
+#include "qemu/range.h"
 
 /*
  * Reference for the LUKS format implemented here is
@@ -95,12 +96,23 @@ qcrypto_block_luks_cipher_size_map_twofish[] = {
     { 0, 0 },
 };
 
+#ifdef CONFIG_CRYPTO_SM4
+static const QCryptoBlockLUKSCipherSizeMap
+qcrypto_block_luks_cipher_size_map_sm4[] = {
+    { 16, QCRYPTO_CIPHER_ALG_SM4},
+    { 0, 0 },
+};
+#endif
+
 static const QCryptoBlockLUKSCipherNameMap
 qcrypto_block_luks_cipher_name_map[] = {
     { "aes", qcrypto_block_luks_cipher_size_map_aes },
     { "cast5", qcrypto_block_luks_cipher_size_map_cast5 },
     { "serpent", qcrypto_block_luks_cipher_size_map_serpent },
     { "twofish", qcrypto_block_luks_cipher_size_map_twofish },
+#ifdef CONFIG_CRYPTO_SM4
+    { "sm4", qcrypto_block_luks_cipher_size_map_sm4},
+#endif
 };
 
 QEMU_BUILD_BUG_ON(sizeof(struct QCryptoBlockLUKSKeySlot) != 48);
@@ -244,7 +256,7 @@ qcrypto_block_luks_has_format(const uint8_t *buf,
  *
  * When calculating ESSIV IVs, the cipher length used by ESSIV
  * may be different from the cipher length used for the block
- * encryption, becauses dm-crypt uses the hash digest length
+ * encryption, because dm-crypt uses the hash digest length
  * as the key size. ie, if you have AES 128 as the block cipher
  * and SHA 256 as ESSIV hash, then ESSIV will use AES 256 as
  * the cipher since that gets a key length matching the digest
@@ -393,7 +405,7 @@ qcrypto_block_luks_from_disk_endian(QCryptoBlockLUKSHeader *hdr)
 }
 
 /*
- * Stores the main LUKS header, taking care of endianess
+ * Stores the main LUKS header, taking care of endianness
  */
 static int
 qcrypto_block_luks_store_header(QCryptoBlock *block,
@@ -423,7 +435,7 @@ qcrypto_block_luks_store_header(QCryptoBlock *block,
 }
 
 /*
- * Loads the main LUKS header,and byteswaps it to native endianess
+ * Loads the main LUKS header, and byteswaps it to native endianness
  * And run basic sanity checks on it
  */
 static int
@@ -457,12 +469,15 @@ qcrypto_block_luks_load_header(QCryptoBlock *block,
  * Does basic sanity checks on the LUKS header
  */
 static int
-qcrypto_block_luks_check_header(const QCryptoBlockLUKS *luks, Error **errp)
+qcrypto_block_luks_check_header(const QCryptoBlockLUKS *luks,
+                                unsigned int flags,
+                                Error **errp)
 {
     size_t i, j;
 
     unsigned int header_sectors = QCRYPTO_BLOCK_LUKS_KEY_SLOT_OFFSET /
         QCRYPTO_BLOCK_LUKS_SECTOR_SIZE;
+    bool detached = flags & QCRYPTO_BLOCK_OPEN_DETACHED;
 
     if (memcmp(luks->header.magic, qcrypto_block_luks_magic,
                QCRYPTO_BLOCK_LUKS_MAGIC_LEN) != 0) {
@@ -494,7 +509,7 @@ qcrypto_block_luks_check_header(const QCryptoBlockLUKS *luks, Error **errp)
         return -1;
     }
 
-    if (luks->header.payload_offset_sector <
+    if (!detached && luks->header.payload_offset_sector <
         DIV_ROUND_UP(QCRYPTO_BLOCK_LUKS_KEY_SLOT_OFFSET,
                      QCRYPTO_BLOCK_LUKS_SECTOR_SIZE)) {
         error_setg(errp, "LUKS payload is overlapping with the header");
@@ -543,7 +558,7 @@ qcrypto_block_luks_check_header(const QCryptoBlockLUKS *luks, Error **errp)
             return -1;
         }
 
-        if (start1 + len1 > luks->header.payload_offset_sector) {
+        if (!detached && start1 + len1 > luks->header.payload_offset_sector) {
             error_setg(errp,
                        "Keyslot %zu is overlapping with the encrypted payload",
                        i);
@@ -558,7 +573,7 @@ qcrypto_block_luks_check_header(const QCryptoBlockLUKS *luks, Error **errp)
                                                        header_sectors,
                                                        slot2->stripes);
 
-            if (start1 + len1 > start2 && start2 + len2 > start1) {
+            if (ranges_overlap(start1, len1, start2, len2)) {
                 error_setg(errp,
                            "Keyslots %zu and %zu are overlapping in the header",
                            i, j);
@@ -706,13 +721,13 @@ qcrypto_block_luks_store_key(QCryptoBlock *block,
 
     assert(slot_idx < QCRYPTO_BLOCK_LUKS_NUM_KEY_SLOTS);
     slot = &luks->header.key_slots[slot_idx];
+    splitkeylen = luks->header.master_key_len * slot->stripes;
+
     if (qcrypto_random_bytes(slot->salt,
                              QCRYPTO_BLOCK_LUKS_SALT_LEN,
                              errp) < 0) {
         goto cleanup;
     }
-
-    splitkeylen = luks->header.master_key_len * slot->stripes;
 
     /*
      * Determine how many iterations are required to
@@ -1175,7 +1190,6 @@ qcrypto_block_luks_open(QCryptoBlock *block,
                         QCryptoBlockReadFunc readfunc,
                         void *opaque,
                         unsigned int flags,
-                        size_t n_threads,
                         Error **errp)
 {
     QCryptoBlockLUKS *luks = NULL;
@@ -1203,7 +1217,7 @@ qcrypto_block_luks_open(QCryptoBlock *block,
         goto fail;
     }
 
-    if (qcrypto_block_luks_check_header(luks, errp) < 0) {
+    if (qcrypto_block_luks_check_header(luks, flags, errp) < 0) {
         goto fail;
     }
 
@@ -1248,7 +1262,6 @@ qcrypto_block_luks_open(QCryptoBlock *block,
                                       luks->cipher_mode,
                                       masterkey,
                                       luks->header.master_key_len,
-                                      n_threads,
                                       errp) < 0) {
             goto fail;
         }
@@ -1257,6 +1270,7 @@ qcrypto_block_luks_open(QCryptoBlock *block,
     block->sector_size = QCRYPTO_BLOCK_LUKS_SECTOR_SIZE;
     block->payload_offset = luks->header.payload_offset_sector *
         block->sector_size;
+    block->detached_header = (block->payload_offset == 0) ? true : false;
 
     return 0;
 
@@ -1301,6 +1315,7 @@ qcrypto_block_luks_create(QCryptoBlock *block,
     const char *hash_alg;
     g_autofree char *cipher_mode_spec = NULL;
     uint64_t iters;
+    uint64_t detached_header_size;
 
     memcpy(&luks_opts, &options->u.luks, sizeof(luks_opts));
     if (!luks_opts.has_iter_time) {
@@ -1440,7 +1455,7 @@ qcrypto_block_luks_create(QCryptoBlock *block,
     /* Setup the block device payload encryption objects */
     if (qcrypto_block_init_cipher(block, luks_opts.cipher_alg,
                                   luks_opts.cipher_mode, masterkey,
-                                  luks->header.master_key_len, 1, errp) < 0) {
+                                  luks->header.master_key_len, errp) < 0) {
         goto error;
     }
 
@@ -1529,19 +1544,32 @@ qcrypto_block_luks_create(QCryptoBlock *block,
         slot->stripes = QCRYPTO_BLOCK_LUKS_STRIPES;
     }
 
-    /* The total size of the LUKS headers is the partition header + key
-     * slot headers, rounded up to the nearest sector, combined with
-     * the size of each master key material region, also rounded up
-     * to the nearest sector */
-    luks->header.payload_offset_sector = header_sectors +
-            QCRYPTO_BLOCK_LUKS_NUM_KEY_SLOTS * split_key_sectors;
+    if (block->detached_header) {
+        /*
+         * For a detached LUKS header image, set the payload_offset_sector
+         * to 0 to specify the starting point for read/write
+         */
+        luks->header.payload_offset_sector = 0;
+    } else {
+        /*
+         * The total size of the LUKS headers is the partition header + key
+         * slot headers, rounded up to the nearest sector, combined with
+         * the size of each master key material region, also rounded up
+         * to the nearest sector
+         */
+        luks->header.payload_offset_sector = header_sectors +
+                QCRYPTO_BLOCK_LUKS_NUM_KEY_SLOTS * split_key_sectors;
+    }
 
     block->sector_size = QCRYPTO_BLOCK_LUKS_SECTOR_SIZE;
     block->payload_offset = luks->header.payload_offset_sector *
         block->sector_size;
+    detached_header_size =
+        (header_sectors + QCRYPTO_BLOCK_LUKS_NUM_KEY_SLOTS *
+         split_key_sectors) * block->sector_size;
 
     /* Reserve header space to match payload offset */
-    initfunc(block, block->payload_offset, opaque, &local_err);
+    initfunc(block, detached_header_size, opaque, &local_err);
     if (local_err) {
         error_propagate(errp, local_err);
         goto error;
@@ -1867,6 +1895,7 @@ static int qcrypto_block_luks_get_info(QCryptoBlock *block,
     info->u.luks.master_key_iters = luks->header.master_key_iterations;
     info->u.luks.uuid = g_strndup((const char *)luks->header.uuid,
                                   sizeof(luks->header.uuid));
+    info->u.luks.detached_header = block->detached_header;
 
     for (i = 0; i < QCRYPTO_BLOCK_LUKS_NUM_KEY_SLOTS; i++) {
         slot = g_new0(QCryptoBlockInfoLUKSSlot, 1);

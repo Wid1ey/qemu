@@ -22,7 +22,7 @@
 #endif
 
 #include "ui/kbd-state.h"
-#if defined(CONFIG_OPENGL)
+#ifdef CONFIG_OPENGL
 # include "ui/egl-helpers.h"
 #endif
 
@@ -44,7 +44,7 @@ struct sdl2_console {
     int ignore_hotkeys;
     SDL_GLContext winctx;
     QKbdState *kbd;
-#if defined(CONFIG_OPENGL)
+#ifdef CONFIG_OPENGL
     QemuGLShader *gls;
     egl_fb guest_fb;
     egl_fb win_fb;

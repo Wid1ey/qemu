@@ -90,11 +90,12 @@ QEMUCursor *cursor_builtin_left_ptr(void)
     return cursor_parse_xpm(cursor_left_ptr_xpm);
 }
 
-QEMUCursor *cursor_alloc(int width, int height)
+QEMUCursor *cursor_alloc(uint16_t width, uint16_t height)
 {
     QEMUCursor *c;
     size_t datasize = width * height * sizeof(uint32_t);
 
+    /* Modern physical hardware typically uses 512x512 sprites */
     if (width > 512 || height > 512) {
         return NULL;
     }
@@ -231,7 +232,7 @@ void cursor_get_mono_mask(QEMUCursor *c, int transparent, uint8_t *mask)
     for (y = 0; y < c->height; y++) {
         bit = 0x80;
         for (x = 0; x < c->width; x++, data++) {
-            if ((*data & 0xff000000) != 0xff000000) {
+            if ((*data & 0x80000000) == 0x0) { /* Alpha < 0x80 (128) */
                 if (transparent != 0) {
                     mask[x/8] |= bit;
                 }

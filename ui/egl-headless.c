@@ -64,10 +64,13 @@ static void egl_scanout_disable(DisplayChangeListener *dcl)
 }
 
 static void egl_scanout_imported_texture(DisplayChangeListener *dcl,
-                                         uint32_t backing_texture,
-                                         bool backing_y_0_top,
-                                         uint32_t backing_width,
-                                         uint32_t backing_height)
+                                uint32_t backing_id,
+                                bool backing_y_0_top,
+                                uint32_t backing_width,
+                                uint32_t backing_height,
+                                uint32_t x, uint32_t y,
+                                uint32_t w, uint32_t h,
+                                void *d3d_tex2d)
 {
     egl_dpy *edpy = container_of(dcl, egl_dpy, dcl);
 
@@ -75,7 +78,7 @@ static void egl_scanout_imported_texture(DisplayChangeListener *dcl,
 
     /* source framebuffer */
     egl_fb_setup_for_tex(&edpy->guest_fb,
-                         backing_width, backing_height, backing_texture, false);
+                         backing_width, backing_height, backing_id, false);
 
     /* dest framebuffer */
     if (edpy->blit_fb.width  != backing_width ||
@@ -94,42 +97,65 @@ static void egl_scanout_texture(DisplayChangeListener *dcl,
     bool backing_y_0_top;
     uint32_t backing_width;
     uint32_t backing_height;
+    void *d3d_tex2d;
 
     GLuint backing_texture = backing_borrow(backing_id, &backing_y_0_top,
-                                            &backing_width, &backing_height);
+                                            &backing_width, &backing_height,
+                                            &d3d_tex2d);
     egl_scanout_imported_texture(dcl, backing_texture, backing_y_0_top,
-                                 backing_width, backing_height);
+                                 backing_width, backing_height,
+                                 x, y, w, h, d3d_tex2d);
 }
 
 #ifdef CONFIG_GBM
-static void egl_scanout_dmabuf(DisplayChangeListener *dcl, QemuDmaBuf *dmabuf)
+
+static void egl_scanout_dmabuf(DisplayChangeListener *dcl,
+                               QemuDmaBuf *dmabuf)
 {
+    uint32_t width, height, texture;
+
     egl_dmabuf_import_texture(dmabuf);
-    if (!dmabuf->texture) {
+    texture = qemu_dmabuf_get_texture(dmabuf);
+    if (!texture) {
         return;
     }
 
-    egl_scanout_imported_texture(dcl, dmabuf->texture,
-                                 false, dmabuf->width, dmabuf->height);
+    width = qemu_dmabuf_get_width(dmabuf);
+    height = qemu_dmabuf_get_height(dmabuf);
+
+    egl_scanout_imported_texture(dcl, texture, false, width, height, 0, 0,
+                        width, height, NULL);
 }
 
 static void egl_cursor_dmabuf(DisplayChangeListener *dcl,
                               QemuDmaBuf *dmabuf, bool have_hot,
                               uint32_t hot_x, uint32_t hot_y)
 {
+    uint32_t width, height, texture;
     egl_dpy *edpy = container_of(dcl, egl_dpy, dcl);
 
     if (dmabuf) {
         egl_dmabuf_import_texture(dmabuf);
-        if (!dmabuf->texture) {
+        texture = qemu_dmabuf_get_texture(dmabuf);
+        if (!texture) {
             return;
         }
-        egl_fb_setup_for_tex(&edpy->cursor_fb, dmabuf->width, dmabuf->height,
-                             dmabuf->texture, false);
+
+        width = qemu_dmabuf_get_width(dmabuf);
+        height = qemu_dmabuf_get_height(dmabuf);
+        egl_fb_setup_for_tex(&edpy->cursor_fb, width, height, texture, false);
     } else {
         egl_fb_destroy(&edpy->cursor_fb);
     }
 }
+
+static void egl_release_dmabuf(DisplayChangeListener *dcl,
+                               QemuDmaBuf *dmabuf)
+{
+    egl_dmabuf_release_texture(dmabuf);
+}
+
+#endif
 
 static void egl_cursor_position(DisplayChangeListener *dcl,
                                 uint32_t pos_x, uint32_t pos_y)
@@ -139,13 +165,6 @@ static void egl_cursor_position(DisplayChangeListener *dcl,
     edpy->pos_x = pos_x;
     edpy->pos_y = pos_y;
 }
-
-static void egl_release_dmabuf(DisplayChangeListener *dcl,
-                               QemuDmaBuf *dmabuf)
-{
-    egl_dmabuf_release_texture(dmabuf);
-}
-#endif
 
 static void egl_scanout_flush(DisplayChangeListener *dcl,
                               uint32_t x, uint32_t y,
@@ -163,7 +182,7 @@ static void egl_scanout_flush(DisplayChangeListener *dcl,
         egl_texture_blit(edpy->gls, &edpy->blit_fb, &edpy->guest_fb,
                          !edpy->y_0_top, false);
         egl_texture_blend(edpy->gls, &edpy->blit_fb, &edpy->cursor_fb,
-                          false, !edpy->y_0_top, edpy->pos_x, edpy->pos_y,
+                          !edpy->y_0_top, false, edpy->pos_x, edpy->pos_y,
                           1.0, 1.0);
     } else {
         /* no cursor -> use simple framebuffer blit */
@@ -185,9 +204,9 @@ static const DisplayChangeListenerOps egl_ops = {
 #ifdef CONFIG_GBM
     .dpy_gl_scanout_dmabuf   = egl_scanout_dmabuf,
     .dpy_gl_cursor_dmabuf    = egl_cursor_dmabuf,
-    .dpy_gl_cursor_position  = egl_cursor_position,
     .dpy_gl_release_dmabuf   = egl_release_dmabuf,
 #endif
+    .dpy_gl_cursor_position  = egl_cursor_position,
     .dpy_gl_update           = egl_scanout_flush,
 };
 

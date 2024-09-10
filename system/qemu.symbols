@@ -1,0 +1,5 @@
+{
+  qemu_init;
+  qemu_main_loop;
+  qemu_cleanup;
+};
