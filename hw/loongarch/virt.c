@@ -1316,6 +1316,13 @@ static void virt_device_plug_cb(HotplugHandler *hotplug_dev,
     } else if (memhp_type_supported(dev)) {
         virt_mem_plug(hotplug_dev, dev, errp);
     }
+
+#ifdef CONFIG_TPM
+    if (object_dynamic_cast(OBJECT(dev), TYPE_TPM_IF)) {
+        tpm_sysbus_plug(TPM_IF(dev), OBJECT(lvms->platform_bus_dev),
+                        VIRT_PLATFORM_BUS_BASEADDRESS);
+    }
+#endif
 }
 
 static HotplugHandler *virt_get_hotplug_handler(MachineState *machine,
@@ -1422,6 +1429,7 @@ static void virt_class_init(ObjectClass *oc, void *data)
     machine_class_allow_dynamic_sysbus_dev(mc, TYPE_RAMFB_DEVICE);
 #ifdef CONFIG_TPM
     machine_class_allow_dynamic_sysbus_dev(mc, TYPE_TPM_TIS_SYSBUS);
+    machine_class_allow_dynamic_sysbus_dev(mc, TYPE_TPM_CRB_SYSBUS);
 #endif
 }
 
