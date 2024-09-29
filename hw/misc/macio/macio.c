@@ -35,7 +35,6 @@
 #include "hw/misc/macio/macio.h"
 #include "hw/intc/heathrow_pic.h"
 #include "trace.h"
-#include "include/hw/audio/screamer.h"
 
 #define ESCC_CLOCK 3686400
 
@@ -102,17 +101,6 @@ static bool macio_common_realize(PCIDevice *d, Error **errp)
     sbd = SYS_BUS_DEVICE(&s->dbdma);
     memory_region_add_subregion(&s->bar, 0x08000,
                                 sysbus_mmio_get_region(sbd, 0));
-    if (!qdev_realize(DEVICE(&s->screamer), BUS(&s->macio_bus), errp)) {
-        return false;
-    }
-
-    /* Add the screamer sound chip */
-    sbd = SYS_BUS_DEVICE(&s->screamer);
-    const int offset = 0x14000; /* Offset from base address register (bar) */
-    const int region_number = 0; /* which memory region to use */
-    memory_region_add_subregion(&s->bar, offset,
-                                sysbus_mmio_get_region(sbd,
-                                                       region_number));
 
     qdev_prop_set_uint32(DEVICE(&s->escc), "disabled", 0);
     qdev_prop_set_uint32(DEVICE(&s->escc), "frequency", ESCC_CLOCK);
@@ -356,19 +344,6 @@ static void macio_newworld_realize(PCIDevice *d, Error **errp)
         memory_region_add_subregion(&s->bar, 0x16000,
                                     sysbus_mmio_get_region(sbd, 0));
     }
-
-    /* Screamer Sound Chip */
-    const int gpio_0 = 0;
-    const int gpio_1 = 1;
-    const int transmit_channel = 0x10;
-    const int receive_channel = 0x12;
-    sbd = SYS_BUS_DEVICE(&s->screamer);
-    sysbus_connect_irq(sbd, gpio_0, qdev_get_gpio_in(pic_dev,
-                                           NEWWORLD_SCREAMER_IRQ));
-    sysbus_connect_irq(sbd, gpio_1, qdev_get_gpio_in(pic_dev,
-                                           NEWWORLD_SCREAMER_DMA_IRQ));
-    screamer_register_dma_functions(SCREAMER(sbd), &s->dbdma,
-                                    transmit_channel, receive_channel);
 }
 
 static void macio_newworld_init(Object *obj)
@@ -398,9 +373,6 @@ static void macio_instance_init(Object *obj)
     object_initialize_child(obj, "dbdma", &s->dbdma, TYPE_MAC_DBDMA);
 
     object_initialize_child(obj, "escc", &s->escc, TYPE_ESCC);
-
-    object_initialize_child(obj, SOUND_CHIP_NAME, &s->screamer,
-                            TYPE_SCREAMER);
 }
 
 static const VMStateDescription vmstate_macio_oldworld = {

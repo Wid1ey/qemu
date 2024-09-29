@@ -48,9 +48,6 @@ config PL041
 config CS4231
     bool
 
-config SCREAMER
-    bool
-
 config ASC
     bool
 
