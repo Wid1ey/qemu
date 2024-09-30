@@ -931,67 +931,51 @@ for subtype in ('aligned', 'unaligned', 'slowpath'):
 
     START_COLLECTION(f"qemu_ld_{subtype}_unsigned_le")
 
-    ld_thunk(f"qemu_ld_ub_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_ret_ldub_mmu",
+    ld_thunk(f"qemu_ld_ub_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_ldub_mmu",
         fastpath_32b=["ldrb Wd, [Xn, x27]"], fastpath_64b=["ldrb Wd, [Xn, x27]"],
         force_slowpath=is_slowpath,
     )
-    ld_thunk(f"qemu_ld_leuw_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_le_lduw_mmu",
+    ld_thunk(f"qemu_ld_leuw_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_lduw_mmu",
         fastpath_32b=["ldrh Wd, [Xn, x27]"], fastpath_64b=["ldrh Wd, [Xn, x27]"],
         force_slowpath=is_slowpath,
     )
-    ld_thunk(f"qemu_ld_leul_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_le_ldul_mmu",
+    ld_thunk(f"qemu_ld_leul_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_ldul_mmu",
         fastpath_32b=["ldr Wd, [Xn, x27]"], fastpath_64b=["ldr Wd, [Xn, x27]"],
         force_slowpath=is_slowpath,
     )
-    ld_thunk(f"qemu_ld_leq_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_le_ldq_mmu",
+    ld_thunk(f"qemu_ld_leq_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_ldq_mmu",
         fastpath_32b=["ldr Xd, [Xn, x27]"], fastpath_64b=["ldr Xd, [Xn, x27]"],
         force_slowpath=is_slowpath,
     )
 
     START_COLLECTION(f"qemu_ld_{subtype}_signed_le")
 
-    ld_thunk(f"qemu_ld_sb_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_ret_ldub_mmu_signed",
+    ld_thunk(f"qemu_ld_sb_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_ldub_mmu_signed",
         fastpath_32b=["ldrsb Wd, [Xn, x27]"], fastpath_64b=["ldrsb Xd, [Xn, x27]"],
         force_slowpath=is_slowpath,
     )
-    ld_thunk(f"qemu_ld_lesw_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_le_lduw_mmu_signed",
+    ld_thunk(f"qemu_ld_lesw_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_lduw_mmu_signed",
         fastpath_32b=["ldrsh Wd, [Xn, x27]"], fastpath_64b=["ldrsh Xd, [Xn, x27]"],
         force_slowpath=is_slowpath,
     )
-    ld_thunk(f"qemu_ld_lesl_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_le_ldul_mmu_signed",
+    ld_thunk(f"qemu_ld_lesl_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_ldul_mmu_signed",
         fastpath_32b=["ldrsw Xd, [Xn, x27]"], fastpath_64b=["ldrsw Xd, [Xn, x27]"],
         force_slowpath=is_slowpath,
     )
 
     # Special variant for the most common modes, as a speedup optimization.
-    ld_thunk(f"qemu_ld_ub_{subtype}_mode02", is_aligned=is_aligned, slowpath_helper="helper_ret_ldub_mmu",
+    ld_thunk(f"qemu_ld_ub_{subtype}_mode02", is_aligned=is_aligned, slowpath_helper="helper_ldub_mmu",
         fastpath_32b=["ldrb Wd, [Xn, x27]"], fastpath_64b=["ldrb Wd, [Xn, x27]"],
         force_slowpath=is_slowpath, immediate=0x02
     )
-    ld_thunk(f"qemu_ld_leq_{subtype}_mode32", is_aligned=is_aligned, slowpath_helper="helper_le_ldq_mmu",
+    ld_thunk(f"qemu_ld_leq_{subtype}_mode32", is_aligned=is_aligned, slowpath_helper="helper_ldq_mmu",
         fastpath_32b=["ldr Xd, [Xn, x27]"], fastpath_64b=["ldr Xd, [Xn, x27]"],
         force_slowpath=is_slowpath, immediate=0x32
     )
-    ld_thunk(f"qemu_ld_leq_{subtype}_mode3a", is_aligned=is_aligned, slowpath_helper="helper_le_ldq_mmu",
+    ld_thunk(f"qemu_ld_leq_{subtype}_mode3a", is_aligned=is_aligned, slowpath_helper="helper_ldq_mmu",
         fastpath_32b=["ldr Xd, [Xn, x27]"], fastpath_64b=["ldr Xd, [Xn, x27]"],
         force_slowpath=is_slowpath, immediate=0x3a
     )
-
-    START_COLLECTION(f"qemu_ld_{subtype}_be")
-
-    # For now, leave the rare/big-endian stuff slow-path only.
-    ld_thunk(f"qemu_ld_beuw_{subtype}", None, None, "helper_be_lduw_mmu",         
-            is_aligned=is_aligned, force_slowpath=is_slowpath)
-    ld_thunk(f"qemu_ld_besw_{subtype}", None, None, "helper_be_lduw_mmu_signed",  
-            is_aligned=is_aligned, force_slowpath=is_slowpath)
-    ld_thunk(f"qemu_ld_beul_{subtype}", None, None, "helper_be_ldul_mmu",         
-            is_aligned=is_aligned, force_slowpath=is_slowpath)
-    ld_thunk(f"qemu_ld_besl_{subtype}", None, None, "helper_be_ldul_mmu_signed",  
-            is_aligned=is_aligned, force_slowpath=is_slowpath)
-    ld_thunk(f"qemu_ld_beq_{subtype}",  None, None, "helper_be_ldq_mmu",          
-            is_aligned=is_aligned, force_slowpath=is_slowpath)
-
-
 
 
 # Handlers for QEMU_ST, which handles guest -> host stores.
@@ -1001,46 +985,36 @@ for subtype in ('aligned', 'unaligned', 'slowpath'):
 
     START_COLLECTION(f"qemu_st_{subtype}_le")
 
-    st_thunk(f"qemu_st_ub_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_ret_stb_mmu",
+    st_thunk(f"qemu_st_ub_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_stb_mmu",
         fastpath_32b=["strb Wd, [Xn, x27]"], fastpath_64b=["strb Wd, [Xn, x27]"],
         force_slowpath=is_slowpath,
     )
-    st_thunk(f"qemu_st_leuw_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_le_stw_mmu",
+    st_thunk(f"qemu_st_leuw_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_stw_mmu",
         fastpath_32b=["strh Wd, [Xn, x27]"], fastpath_64b=["strh Wd, [Xn, x27]"],
         force_slowpath=is_slowpath,
     )
-    st_thunk(f"qemu_st_leul_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_le_stl_mmu",
+    st_thunk(f"qemu_st_leul_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_stl_mmu",
         fastpath_32b=["str Wd, [Xn, x27]"], fastpath_64b=["str Wd, [Xn, x27]"],
         force_slowpath=is_slowpath,
     )
-    st_thunk(f"qemu_st_leq_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_le_stq_mmu",
+    st_thunk(f"qemu_st_leq_{subtype}", is_aligned=is_aligned, slowpath_helper="helper_stq_mmu",
         fastpath_32b=["str Xd, [Xn, x27]"], fastpath_64b=["str Xd, [Xn, x27]"],
         force_slowpath=is_slowpath,
     )
     
     # Special optimization for the most common modes.
-    st_thunk(f"qemu_st_ub_{subtype}_mode02", is_aligned=is_aligned, slowpath_helper="helper_ret_stb_mmu",
+    st_thunk(f"qemu_st_ub_{subtype}_mode02", is_aligned=is_aligned, slowpath_helper="helper_stb_mmu",
         fastpath_32b=["strb Wd, [Xn, x27]"], fastpath_64b=["strb Wd, [Xn, x27]"],
         force_slowpath=is_slowpath, immediate=0x02
     )
-    st_thunk(f"qemu_st_leq_{subtype}_mode32", is_aligned=is_aligned, slowpath_helper="helper_le_stq_mmu",
+    st_thunk(f"qemu_st_leq_{subtype}_mode32", is_aligned=is_aligned, slowpath_helper="helper_stq_mmu",
         fastpath_32b=["str Xd, [Xn, x27]"], fastpath_64b=["str Xd, [Xn, x27]"],
         force_slowpath=is_slowpath, immediate=0x32
     )
-    st_thunk(f"qemu_st_leq_{subtype}_mode3a", is_aligned=is_aligned, slowpath_helper="helper_le_stq_mmu",
+    st_thunk(f"qemu_st_leq_{subtype}_mode3a", is_aligned=is_aligned, slowpath_helper="helper_stq_mmu",
         fastpath_32b=["str Xd, [Xn, x27]"], fastpath_64b=["str Xd, [Xn, x27]"],
         force_slowpath=is_slowpath, immediate=0x3a
     )
-
-    START_COLLECTION(f"qemu_st_{subtype}_be")
-
-    # For now, leave the rare/big-endian stuff slow-path only.
-    st_thunk(f"qemu_st_beuw_{subtype}", None, None, "helper_be_stw_mmu",  
-            is_aligned=is_aligned, force_slowpath=is_slowpath)
-    st_thunk(f"qemu_st_beul_{subtype}", None, None, "helper_be_stl_mmu",
-            is_aligned=is_aligned, force_slowpath=is_slowpath)
-    st_thunk(f"qemu_st_beq_{subtype}",  None, None, "helper_be_stq_mmu",
-            is_aligned=is_aligned, force_slowpath=is_slowpath)
 
 
 #

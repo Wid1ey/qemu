@@ -40,16 +40,7 @@
 #ifndef TCG_TARGET_H
 #define TCG_TARGET_H
 
-#if UINTPTR_MAX == UINT32_MAX
-# error We only support AArch64 running in 64B mode.
-#elif UINTPTR_MAX == UINT64_MAX
-# define TCG_TARGET_REG_BITS 64
-#else
-# error Unknown pointer size for tcti target
-#endif
-
 #define TCG_TARGET_INSN_UNIT_SIZE        1
-#define TCG_TARGET_TLB_DISPLACEMENT_BITS 32
 #define MAX_CODE_GEN_BUFFER_SIZE  ((size_t)-1)
 
 // We're an interpreted target; even if we're JIT-compiling to our interpreter's
@@ -77,15 +68,14 @@
 #define TCG_TARGET_HAS_ext8u_i64        1
 #define TCG_TARGET_HAS_ext16u_i64       1
 #define TCG_TARGET_HAS_ext32u_i64       1
+#define TCG_TARGET_HAS_extr_i64_i32     0
 
 // Register extractions.
 #define TCG_TARGET_HAS_extrl_i64_i32    1
 #define TCG_TARGET_HAS_extrh_i64_i32    1
 
 // Negations.
-#define TCG_TARGET_HAS_neg_i32          1
 #define TCG_TARGET_HAS_not_i32          1
-#define TCG_TARGET_HAS_neg_i64          1
 #define TCG_TARGET_HAS_not_i64          1
 
 // Logicals.
@@ -93,6 +83,8 @@
 #define TCG_TARGET_HAS_orc_i32          1
 #define TCG_TARGET_HAS_eqv_i32          1
 #define TCG_TARGET_HAS_rot_i32          1
+#define TCG_TARGET_HAS_negsetcond_i32   0
+#define TCG_TARGET_HAS_negsetcond_i64   0
 #define TCG_TARGET_HAS_nand_i32         1
 #define TCG_TARGET_HAS_nor_i32          1
 #define TCG_TARGET_HAS_andc_i64         1
@@ -107,6 +99,7 @@
 #define TCG_TARGET_HAS_ctz_i32          1
 #define TCG_TARGET_HAS_clz_i64          1
 #define TCG_TARGET_HAS_ctz_i64          1
+#define TCG_TARGET_HAS_tst              0
 
 // Swaps.
 #define TCG_TARGET_HAS_bswap16_i32      1
@@ -114,7 +107,6 @@
 #define TCG_TARGET_HAS_bswap16_i64      1
 #define TCG_TARGET_HAS_bswap32_i64      1
 #define TCG_TARGET_HAS_bswap64_i64      1
-#define TCG_TARGET_HAS_MEMORY_BSWAP     1
 
 //
 // Supported optional vector instructions.
@@ -143,6 +135,7 @@
 #define TCG_TARGET_HAS_minmax_vec       1
 #define TCG_TARGET_HAS_bitsel_vec       1
 #define TCG_TARGET_HAS_cmpsel_vec       0
+#define TCG_TARGET_HAS_tst_vec          0
 
 //
 // Unsupported instructions.
@@ -166,6 +159,7 @@
 // constraints for 8-bit loads and stores. We don't need to do so, so we'll leave
 // this unimplemented, as we gain nothing by it.
 #define TCG_TARGET_HAS_qemu_st8_i32     0
+#define TCG_TARGET_HAS_qemu_ldst_i128   0
 
 // These should always be zero on our 64B platform.
 #define TCG_TARGET_HAS_muls2_i64        0
