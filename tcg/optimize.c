@@ -2303,9 +2303,11 @@ static bool fold_setcond(OptContext *ctx, TCGOp *op)
         return tcg_opt_gen_movi(ctx, op, op->args[0], i);
     }
 
+#if !defined(CONFIG_TCG_THREADED_INTERPRETER) /* FIXME: font issues in TCTI */
     if (fold_setcond_zmask(ctx, op, false)) {
         return true;
     }
+#endif
     fold_setcond_tst_pow2(ctx, op, false);
 
     ctx->z_mask = 1;
@@ -2321,9 +2323,11 @@ static bool fold_negsetcond(OptContext *ctx, TCGOp *op)
         return tcg_opt_gen_movi(ctx, op, op->args[0], -i);
     }
 
+#if !defined(CONFIG_TCG_THREADED_INTERPRETER) /* FIXME: font issues in TCTI */
     if (fold_setcond_zmask(ctx, op, true)) {
         return true;
     }
+#endif
     fold_setcond_tst_pow2(ctx, op, true);
 
     /* Value is {0,-1} so all bits are repetitions of the sign. */
