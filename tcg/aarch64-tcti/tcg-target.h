@@ -155,8 +155,6 @@
 
 // We don't currently support gadgets with more than three arguments,
 // so we can't yet create movcond, deposit, or extract gadgets.
-#define TCG_TARGET_HAS_movcond_i32      0
-#define TCG_TARGET_HAS_movcond_i64      0
 #define TCG_TARGET_HAS_deposit_i32      0
 #define TCG_TARGET_HAS_deposit_i64      0
 #define TCG_TARGET_HAS_extract_i32      0
