@@ -136,6 +136,7 @@ config MAC_OLDWORLD
     select HEATHROW_PIC
     select MACIO
     select FW_CFG_PPC
+    select SCREAMER
 
 config MAC_NEWWORLD
     bool
