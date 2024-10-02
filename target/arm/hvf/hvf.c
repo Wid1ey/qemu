@@ -1000,12 +1000,12 @@ int hvf_arch_init_vcpu(CPUState *cpu)
 
 #if defined(CONFIG_HVF_PRIVATE)
     /* enable TSO mode */
-    if (hvf_state->tso_mode) {
+    if (hvf_tso_mode) {
         uint64_t actlr;
-        ret = _hv_vcpu_get_actlr(cpu->hvf->fd, &actlr);
+        ret = _hv_vcpu_get_actlr(cpu->accel->fd, &actlr);
         assert_hvf_ok(ret);
         actlr |= ACTLR_EL1_TSO_ENABLE_MASK;
-        ret = _hv_vcpu_set_actlr(cpu->hvf->fd, actlr);
+        ret = _hv_vcpu_set_actlr(cpu->accel->fd, actlr);
         assert_hvf_ok(ret);
     }
 #endif
