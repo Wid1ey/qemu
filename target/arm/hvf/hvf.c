@@ -115,6 +115,8 @@ static const uint16_t dbgwvr_regs[] = {
     HV_SYS_REG_DBGWVR15_EL1,
 };
 
+#if !defined(CONFIG_HVF_PRIVATE)
+
 static inline int hvf_arm_num_brps(hv_vcpu_config_t config)
 {
     uint64_t val;
@@ -148,6 +150,8 @@ void hvf_arm_init_debug(void)
     hw_watchpoints =
         g_array_sized_new(true, true, sizeof(HWWatchpoint), max_hw_wps);
 }
+
+#endif
 
 #define HVF_SYSREG(crn, crm, op0, op1, op2) \
         ENCODE_AA64_CP_REG(CP_REG_ARM64_SYSREG_CP, crn, crm, op0, op1, op2)
@@ -2081,10 +2085,14 @@ int hvf_arch_init(void)
     vmstate_register(NULL, 0, &vmstate_hvf_vtimer, &vtimer);
     qemu_add_vm_change_state_handler(hvf_vm_state_change, &vtimer);
 
+#if !defined(CONFIG_HVF_PRIVATE)
     hvf_arm_init_debug();
+#endif
 
     return 0;
 }
+
+#if !defined(CONFIG_HVF_PRIVATE)
 
 static const uint32_t brk_insn = 0xd4200000;
 
@@ -2290,3 +2298,40 @@ bool hvf_arch_supports_guest_debug(void)
 {
     return true;
 }
+
+#else
+
+int hvf_arch_insert_sw_breakpoint(CPUState *cpu, struct hvf_sw_breakpoint *bp)
+{
+    return -ENOSYS;
+}
+
+int hvf_arch_remove_sw_breakpoint(CPUState *cpu, struct hvf_sw_breakpoint *bp)
+{
+    return -ENOSYS;
+}
+
+int hvf_arch_insert_hw_breakpoint(vaddr addr, vaddr len, int type)
+{
+    return -ENOSYS;
+}
+
+int hvf_arch_remove_hw_breakpoint(vaddr addr, vaddr len, int type)
+{
+    return -ENOSYS;
+}
+
+void hvf_arch_remove_all_hw_breakpoints(void)
+{
+}
+
+void hvf_arch_update_guest_debug(CPUState *cpu)
+{
+}
+
+bool hvf_arch_supports_guest_debug(void)
+{
+    return false;
+}
+
+#endif
