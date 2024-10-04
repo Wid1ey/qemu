@@ -911,6 +911,33 @@ static bool hvf_arm_get_host_cpu_features(ARMHostCPUFeatures *ahcf)
     return r == HV_SUCCESS;
 }
 
+static hv_return_t hvf_vcpu_get_actlr(hv_vcpu_t vcpu, uint64_t* value)
+{
+#if defined(CONFIG_HVF_PRIVATE)
+    return _hv_vcpu_get_actlr(vcpu, value);
+#else
+    if (__builtin_available(macOS 15, *)) {
+        return hv_vcpu_get_sys_reg(vcpu, HV_SYS_REG_ACTLR_EL1, value);
+    } else {
+        return HV_UNSUPPORTED;
+    }
+#endif
+}
+
+
+static hv_return_t hvf_vcpu_set_actlr(hv_vcpu_t vcpu, uint64_t value)
+{
+#if defined(CONFIG_HVF_PRIVATE)
+    return _hv_vcpu_set_actlr(vcpu, value);
+#else
+    if (__builtin_available(macOS 15, *)) {
+        return hv_vcpu_set_sys_reg(vcpu, HV_SYS_REG_ACTLR_EL1, value);
+    } else {
+        return HV_UNSUPPORTED;
+    }
+#endif
+}
+
 void hvf_arm_set_cpu_features_from_host(ARMCPU *cpu)
 {
     if (!arm_host_cpu_features.dtb_compatible) {
@@ -1002,17 +1029,15 @@ int hvf_arch_init_vcpu(CPUState *cpu)
                               &arm_cpu->isar.id_aa64mmfr0);
     assert_hvf_ok(ret);
 
-#if defined(CONFIG_HVF_PRIVATE)
     /* enable TSO mode */
     if (hvf_tso_mode) {
         uint64_t actlr;
-        ret = _hv_vcpu_get_actlr(cpu->accel->fd, &actlr);
+        ret = hvf_vcpu_get_actlr(cpu->accel->fd, &actlr);
         assert_hvf_ok(ret);
         actlr |= ACTLR_EL1_TSO_ENABLE_MASK;
-        ret = _hv_vcpu_set_actlr(cpu->accel->fd, actlr);
+        ret = hvf_vcpu_set_actlr(cpu->accel->fd, actlr);
         assert_hvf_ok(ret);
     }
-#endif
 
     return 0;
 }

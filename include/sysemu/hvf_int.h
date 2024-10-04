@@ -19,13 +19,19 @@ typedef hv_vcpu_t hvf_vcpuid;
 typedef hv_vcpuid_t hvf_vcpuid;
 #endif
 
-#if defined(CONFIG_HVF_PRIVATE) && defined(__aarch64__)
+#if defined(CONFIG_HVF_PRIVATE)
 extern hv_return_t _hv_vm_config_set_isa(hv_vm_config_t config, uint32_t isa);
 extern hv_return_t _hv_vcpu_get_actlr(hv_vcpu_t vcpu, uint64_t* value);
 extern hv_return_t _hv_vcpu_set_actlr(hv_vcpu_t vcpu, uint64_t value);
+#endif
 
+#if defined(__aarch64__)
+#if defined(CONFIG_HVF_PRIVATE)
 #define HV_VM_CONFIG_ISA_PRIVATE (3)
 #define ACTLR_EL1_TSO_ENABLE_MASK ((1 << 1) | (1 << 9))
+#else
+#define ACTLR_EL1_TSO_ENABLE_MASK ((1 << 1))
+#endif
 #endif
 
 /* hvf_slot flags */

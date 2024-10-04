@@ -341,7 +341,7 @@ static int hvf_accel_init(MachineState *ms)
     return hvf_arch_init();
 }
 
-#if defined(CONFIG_HVF_PRIVATE) && defined(__aarch64__)
+#if defined(__aarch64__)
 
 static bool hvf_get_tso(Object *obj, Error **errp)
 {
@@ -368,7 +368,7 @@ static void hvf_accel_class_init(ObjectClass *oc, void *data)
     ac->allowed = &hvf_allowed;
     ac->gdbstub_supported_sstep_flags = hvf_gdbstub_sstep_flags;
 
-#if defined(CONFIG_HVF_PRIVATE) && defined(__aarch64__)
+#if defined(__aarch64__)
     object_class_property_add_bool(oc, "tso",
         hvf_get_tso, hvf_set_tso);
     object_class_property_set_description(oc, "tso",
